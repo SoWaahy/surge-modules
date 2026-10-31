@@ -1,19 +1,25 @@
-/* Tencent Video cleaner, Surge port (2026-10-31).
-   Original script: TG@ZenMoFeiShi
-   https://github.com/ZenmoFeiShi/Qx/blob/main/Txvideoad.js
-   Adaptation: QX bodyBytes -> Surge binary-body-mode Uint8Array "body".
-   Module enables binary-body-mode for binary rewrite rules.
-   No Tencent Video app real-device test performed.
-*/
+/* Tencent Video Surge port of https://github.com/xingjiu29/txvideo/blob/main/txvideo-ad.js
+ * Derived from ZenmoFeiShi/Qx and Loon compatibility layer by xingjiu29.
+ * 2026-10-31: binary-body-mode adapter; temporary diagnostic URL/body logging omitted.
+ * Original transformation logic is retained. Requires Surge MITM and rewrite scripts.
+ */
+(function ($surgeRequest, $surgeResponse, $surgeDone) {
+  var $request = Object.assign({}, $surgeRequest, { bodyBytes: $surgeRequest.body });
+  var $response = typeof $surgeResponse === "object" && $surgeResponse
+    ? Object.assign({}, $surgeResponse, { bodyBytes: $surgeResponse.body })
+    : undefined;
+  var $done = function (result) {
+    $surgeDone(result && result.bodyBytes ? { body: new Uint8Array(result.bodyBytes) } : result);
+  };
 (() => {
   const TAB_DROP_KEYS = ["smallvideo_entrance", "goods_entrance"];
   const TAB_DROP_TITLES = ["短剧", "好物"];
   const TAB_CUT_WHITELIST = "0;2;4";
   const AD_ANY = ["AdResponseInfo", "InnerAdPromotionEventList", "InnerAdCommonPromotionEventActivityList", "LoadingConfig", "PreloadResourceInfo", "AdFeedInfo"];
   const DROP_MODULES = ["user_center_more_function"];
-  const AD_MODULE_IDS = ["outerPaster"];
-  const FEED_MODULE_TAGS = ["waterfall_feeds_module_mergeid"];
-  const MARKERS = ["AdFeedInfo", "AdResponseInfo", "InnerAd", "LoadingConfig", "PreloadResourceInfo", "GetTabListRsp", "_ad", "teenager_popup_ctrl"].concat(DROP_MODULES);
+const AD_MODULE_IDS = ["outerPaster"];
+const FEED_MODULE_TAGS = ["waterfall_feeds_module_mergeid"];
+const MARKERS = ["AdFeedInfo", "AdResponseInfo", "InnerAd", "LoadingConfig", "PreloadResourceInfo", "GetTabListRsp", "_ad", "teenager_popup_ctrl"].concat(DROP_MODULES);
   const BLOCK_FUNCS = [
     "/trpc.business_splash.ad_ssp_splash.splashService/GetSplashPreload",
     "/trpc.business_splash.ad_ssp_splash.splashService/GetSplashRealtimePoll",
@@ -34,9 +40,7 @@
   ];
   const JCE_TEEN_CONFIG = 89738;
   const JCE_PLAY_TIPS = 126577;
-  // 播放器贴片广告(前贴/中插)，body tag2 为广告单列表
   const JCE_ROLL_ADS = [129278, 130273];
-  // 暂停广告，body tag1.tag1 为包着广告单列表的 simple list
   const JCE_PAUSE_AD = 129196;
   const DROP = {};
 
@@ -329,20 +333,48 @@
   }
   function blocksAt(b, kids) {
     let level = [kids];
+
     for (const f of [2, 5, 1]) {
-      const next = [];
-      for (const k of level) for (const c of kidsOf(b, k, f)) next.push(c);
-      level = next;
-      if (!level.length) break;
+        const next = [];
+
+        for (const k of level) {
+            for (const c of kidsOf(b, k, f)) {
+                next.push(c);
+            }
+        }
+
+        level = next;
+
+        if (!level.length) {
+            break;
+        }
     }
+
     return level;
-  }
-  function adBlock(b, k) { return k.some(x => x.f === 4 && x.w === 2 && anyName(b, x.vs, x.e) === "AdFeedInfo"); }
-  function adAtPath(b, kids) { return blocksAt(b, kids).some(k => adBlock(b, k)); }
-  function adOnlyAtPath(b, kids) {
-    const l = blocksAt(b, kids);
-    return l.length > 0 && l.every(k => adBlock(b, k));
-  }
+}
+
+function adBlock(b, k) {
+    return k.some(function (x) {
+        return x.f === 4 &&
+            x.w === 2 &&
+            anyName(b, x.vs, x.e) === "AdFeedInfo";
+    });
+}
+
+function adAtPath(b, kids) {
+    return blocksAt(b, kids).some(function (k) {
+        return adBlock(b, k);
+    });
+}
+
+function adOnlyAtPath(b, kids) {
+    const level = blocksAt(b, kids);
+
+    return level.length > 0 &&
+        level.every(function (k) {
+            return adBlock(b, k);
+        });
+}
   function wrapsAny(b, k) {
     if (anyName(b, k.vs, k.e)) return true;
     const w = parse(b, k.vs, k.e);
@@ -361,11 +393,25 @@
       if (t && id && DROP_MODULES.indexOf(t) >= 0 && /\.\d+\.\d+$/.test(id)) return true;
       if (t && id !== null && /^[a-z0-9_]+$/.test(t) && /(^ad_|_ad_|_ad$)/.test(t) && (id === "" || /\.\d+\.\d+$/.test(id))) return true;
     }
-    if ((!f1 || f1.e === f1.vs || AD_MODULE_IDS.indexOf(ascii(b, f1.vs, f1.e)) >= 0) && has("AdFeedInfo", x.vs, x.e) && adAtPath(b, kids)) return true;
-    const f6 = kids.find(k => k.f === 6 && k.w === 2);
-    if (f6 && FEED_MODULE_TAGS.indexOf(ascii(b, f6.vs, f6.e)) >= 0 && has("AdFeedInfo", x.vs, x.e) && adOnlyAtPath(b, kids)) return true;
-    return false;
-  }
+    if ((!f1 || f1.e === f1.vs || AD_MODULE_IDS.indexOf(ascii(b, f1.vs, f1.e)) >= 0) &&
+    has("AdFeedInfo", x.vs, x.e) &&
+    adAtPath(b, kids)) {
+    return true;
+}
+
+const f6 = kids.find(function (k) {
+    return k.f === 6 && k.w === 2;
+});
+
+if (f6 &&
+    FEED_MODULE_TAGS.indexOf(ascii(b, f6.vs, f6.e)) >= 0 &&
+    has("AdFeedInfo", x.vs, x.e) &&
+    adOnlyAtPath(b, kids)) {
+    return true;
+}
+
+return false;
+}
   function tabFix(b, x) {
     if (anyName(b, x.vs, x.e) !== "GetTabListRsp") return null;
     const rest = parse(b, ANYV, x.e);
@@ -620,27 +666,49 @@
     return jRebuild(b, s, e, fs, edits);
   }
   function fixPauseAd(b, s, e) {
-    const fs = jFields(b, s, e), w = fs.find(x => x.tag === 1 && x.t === 10);
-    if (!w || b[w.e - 1] !== 0x0b) return null;
-    const ws = jFields(b, w.vs, w.e - 1), l = ws.find(x => x.tag === 1 && x.t === 13);
-    if (!l) return null;
-    jHead(b, l.vs);
-    const n = jInt(b, VP), ds = VP;
-    if (ds + n !== l.e) return null;
-    const inner = jFields(b, ds, l.e), list = inner.find(x => x.tag === 0 && x.t === 9);
-    if (!list || jInt(b, list.vs) <= 0 || find(b, utf8("livemsg"), list.vs, list.e) < 0) return null;
-    const le = new Map();
-    le.set(l, jSimpleList(1, concat([new Uint8Array(jHeadEnc(0, 9)), jIntEnc(0, 0)])));
-    const nw = concat([b.subarray(w.s, w.vs), jRebuild(b, w.vs, w.e - 1, ws, le), new Uint8Array([0x0b])]);
-    const edits = new Map();
-    edits.set(w, nw);
-    return jRebuild(b, s, e, fs, edits);
-  }
+  const fs = jFields(b, s, e), w = fs.find(x => x.tag === 1 && x.t === 10);
+  if (!w || b[w.e - 1] !== 0x0b) return null;
+
+  const ws = jFields(b, w.vs, w.e - 1), l = ws.find(x => x.tag === 1 && x.t === 13);
+  if (!l) return null;
+
+  jHead(b, l.vs);
+  const n = jInt(b, VP), ds = VP;
+  if (ds + n !== l.e) return null;
+
+  const inner = jFields(b, ds, l.e), list = inner.find(x => x.tag === 0 && x.t === 9);
+  if (!list || jInt(b, list.vs) <= 0 || find(b, utf8("livemsg"), list.vs, list.e) < 0) return null;
+
+  const le = new Map();
+  le.set(l, jSimpleList(1, concat([
+    new Uint8Array(jHeadEnc(0, 9)),
+    jIntEnc(0, 0)
+  ])));
+
+  const nw = concat([
+    b.subarray(w.s, w.vs),
+    jRebuild(b, w.vs, w.e - 1, ws, le),
+    new Uint8Array([0x0b])
+  ]);
+
+  const edits = new Map();
+  edits.set(w, nw);
+  return jRebuild(b, s, e, fs, edits);
+}
+    
   function onJce(raw) {
     const b = raw, n = b.length;
     if (n < 100 || b[0] !== 0x13 || u32(b, 1) !== n || b[n - 1] !== 0x03) return null;
     const cmd = (b[8] << 16) | (b[9] << 8) | b[10];
-    const fix = cmd === JCE_TEEN_CONFIG ? fixTeenConfig : cmd === JCE_PLAY_TIPS ? fixPlayTips : JCE_ROLL_ADS.indexOf(cmd) >= 0 ? fixRollAds : cmd === JCE_PAUSE_AD ? fixPauseAd : null;
+    const fix = cmd === JCE_TEEN_CONFIG
+    ? fixTeenConfig
+    : cmd === JCE_PLAY_TIPS
+        ? fixPlayTips
+        : JCE_ROLL_ADS.indexOf(cmd) >= 0
+            ? fixRollAds
+            : cmd === JCE_PAUSE_AD
+                ? fixPauseAd
+                : null;
     if (!fix) return null;
     const gz = find(b, new Uint8Array([0x1f, 0x8b, 0x08]), 60, Math.min(n, 140));
     if (gz < 4) return null;
@@ -704,7 +772,7 @@
     o.enableHdns = false;
     return JSON.stringify(o);
   }
-   const AB_PATCH = { simple_mode_config: patchSimpleMode, ios_nx_netframework_compatible: patchNoQuic, ios_nx_netframework_compatible_bbtf: patchNoQuic, network_resolve_config: patchNoPreResolve };
+  const AB_PATCH = { simple_mode_config: patchSimpleMode, ios_nx_netframework_compatible: patchNoQuic, ios_nx_netframework_compatible_bbtf: patchNoQuic, network_resolve_config: patchNoPreResolve };
   const AB_NEEDLES = [utf8(SIMPLE_KEY), utf8("ios_nx_netframework_compatible"), utf8("network_resolve_config")];
   function onAbConfig(raw) {
     let u8 = raw, gz = false;
@@ -742,9 +810,9 @@
     const isResp = typeof $response !== "undefined" && $response !== null;
     try {
       if (!isResp) {
-        const b = host === "i.video.qq.com" ? toU8($request.body) : null;
+        const b = host === "i.video.qq.com" ? toU8($request.bodyBytes) : null;
         const r = b && b.length ? onTrpcRequest(b) : null;
-        $done(r ? { body: r } : {});
+        $done(r ? { bodyBytes: toBuf(r) } : {});
         return;
       }
       if (host === "rdelivery.qq.com") {
@@ -753,14 +821,14 @@
         $done(o ? { body: o } : {});
         return;
       }
-      const b = toU8($response.body);
+      const b = toU8($response.bodyBytes);
       let r = null;
       if (b && b.length) {
         if (host === "i.video.qq.com") r = onTrpcResponse(b);
         else if (host === "iacc.qq.com") r = onJce(b);
         else if (host === "config.ab.qq.com" && url.split("?")[0].endsWith("/tab/GetTabRemoteConfig")) r = onAbConfig(b);
       }
-      $done(r ? { body: r } : {});
+      $done(r ? { bodyBytes: toBuf(r) } : {});
     } catch (e) {
       console.log("txvideo-ad-clean: " + e);
       $done({});
@@ -768,3 +836,4 @@
   }
   main();
 })();
+})($request, typeof $response === "undefined" ? undefined : $response, $done);
