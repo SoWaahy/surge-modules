@@ -1,0 +1,18 @@
+#!name=腾讯视频净化 (Surge)
+#!author=TG@ZenMoFeiShi (原脚本) / Surge 兼容移植
+#!update=2026-10-31
+#!desc=屏蔽腾讯视频部分开屏/播放/页面广告并精简标签；基于原作者 QX 脚本移植，实机效果依赖腾讯视频版本。
+
+[Rule]
+DOMAIN,iacc.stgw.qq.com,REJECT
+DOMAIN,tacc.video.qq.com,REJECT
+
+[Script]
+腾讯视频-请求 = type=http-request, pattern=^https?:\/\/i\.video\.qq\.com\/(?:\?.*)?$, requires-body=true, binary-body-mode=true, max-size=1048576, script-path=https://raw.githubusercontent.com/SoWaahy/surge-modules/main/Txvideoad-Surge.js
+腾讯视频-响应 = type=http-response, pattern=^https?:\/\/i\.video\.qq\.com\/(?:\?.*)?$, requires-body=true, binary-body-mode=true, max-size=2097152, script-path=https://raw.githubusercontent.com/SoWaahy/surge-modules/main/Txvideoad-Surge.js
+腾讯视频-JCE = type=http-response, pattern=^https?:\/\/iacc\.qq\.com\/(?:\?.*)?$, requires-body=true, binary-body-mode=true, max-size=2097152, script-path=https://raw.githubusercontent.com/SoWaahy/surge-modules/main/Txvideoad-Surge.js
+腾讯视频-Tab = type=http-response, pattern=^https?:\/\/config\.ab\.qq\.com\/tab\/GetTabRemoteConfig(?:\?.*)?$, requires-body=true, binary-body-mode=true, max-size=2097152, script-path=https://raw.githubusercontent.com/SoWaahy/surge-modules/main/Txvideoad-Surge.js
+腾讯视频-配置 = type=http-response, pattern=^https:\/\/rdelivery\.qq\.com\/v1\/sdkconfig\/get(?:\?.*)?$, requires-body=true, script-path=https://raw.githubusercontent.com/SoWaahy/surge-modules/main/Txvideoad-Surge.js
+
+[MITM]
+hostname = %APPEND% i.video.qq.com, iacc.qq.com, config.ab.qq.com, rdelivery.qq.com
