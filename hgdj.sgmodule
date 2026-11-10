@@ -1,0 +1,29 @@
+#!name=红果短剧广告拦截
+#!desc=拦截红果短剧及字节系相关广告请求，同时直连部分内容域名；由 Tartarus2014 的 Loon 插件转换
+#!system=ios
+#!icon=https://raw.githubusercontent.com/Tartarus2014/For-own-use/refs/heads/master/Color/HongGuoDuanJu.png
+# Surge module converted from Loon plugin:
+# https://raw.githubusercontent.com/Tartarus2014/Loon-Script/refs/heads/master/Plugin/Block/hgdj.lpx
+# 原作者及来源：Tartarus2014 / Loon-Script
+# 仅包含 DNS/域名规则，无需开启 MITM。
+
+[Rule]
+# 红果核心广告拦截
+DOMAIN-SUFFIX,hongguoapp.com,REJECT
+DOMAIN-SUFFIX,hongguosdk.com,REJECT
+DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT
+DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT
+DOMAIN-KEYWORD,ad-union-sdk,REJECT
+DOMAIN-KEYWORD,be-pack,REJECT
+DOMAIN-KEYWORD,hongguo.ad,REJECT
+# 字节系广告兜底（注意可能影响其他字节系服务）
+DOMAIN-SUFFIX,ad.pangle.cn,REJECT
+DOMAIN-SUFFIX,ad.pangolin.cn,REJECT
+DOMAIN-SUFFIX,zijieapi.com,REJECT
+DOMAIN-KEYWORD,tnc.snssdk,REJECT
+
+# 红果内容直连
+DOMAIN-SUFFIX,hongguo.com,DIRECT
+DOMAIN-SUFFIX,hongguo.douyin.com,DIRECT
+DOMAIN-SUFFIX,byteimg.com,DIRECT
+DOMAIN-SUFFIX,pstatp.com,DIRECT
